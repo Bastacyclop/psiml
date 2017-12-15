@@ -2,19 +2,15 @@
   (:require [clojure.test :refer :all]
             [psiml.codegen :refer :all]))
 
-(deftest codegen-const
-  (testing "Generating code for constants"
-    (is (= "true" (codegen-expr {:node [:const :true] :type [:bool]})))
-    (is (= "false" (codegen-expr {:node [:const :false] :type [:bool]})))
-    (is (= "42" (codegen-expr {:node [:const 42] :type [:int]})))
-    (is (= "-42" (codegen-expr {:node [:const -42] :type [:int]})))
-    (is (= "{}" (codegen-expr {:node [:const []] :type [:struct]})))
-    (is (= "{'one': 1, 'true': true}" (codegen-expr {:node [:const
-                                                            [:one {:node [:const 1] :type [:int]} 
-                                                             :true {:node [:const :true] :type [:bool]}]]
-                                                     :type [:struct]})))))
-
-; (deftest codegen-var
-;   (testing "Generating code for var"
-;     (is (=  "variable" (codegen-expr {:node [:var :variable] :type [:bool]})))))
-
+(deftest literals
+  (testing "Generating code for literals"
+    (is (= "true" (expr {:node [:lit :true] :type [:bool]})))
+    (is (= "false" (expr {:node [:lit :false] :type [:bool]})))
+    (is (= "42" (expr {:node [:lit 42] :type [:int]})))
+    (is (= "-42" (expr {:node [:lit -42] :type [:int]})))
+    (is (= "{}" (expr {:node [:lit []] :type [:struct]})))
+    (is (= "{'one': 1, 'true': true, 'obj': {}}"
+           (expr {:node [:lit [:one {:node [:lit 1] :type [:int]} 
+                               :true {:node [:lit :true] :type [:bool]}
+                               :obj {:node [:lit []] :type [:struct]} ]]
+                  :type [:struct]})))))
