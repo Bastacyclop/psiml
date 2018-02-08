@@ -18,3 +18,26 @@
                       (by-two binds))
         handler `(cond ~@(interleave tests handlers))]
     `(fn [~e] (apply ~handler (rest ~e)))))
+
+(defmacro debug
+  [expr]
+  (let [r (gensym)]
+    `(let [~r ~expr]
+       (println ~(str expr) ~r) ~r)))
+
+(defn flatten-kw
+  ([kw t] (flatten-kw kw [t] []))
+  ([kw todo flat]
+   (if-let [t (peek todo)]
+     (if (= kw (first t))
+       (recur kw (into (pop todo) (rest t)) flat)
+       (recur kw (pop todo) (cons t flat)))
+     flat)))
+
+(defn merge-kw
+  [kw ts]
+  (if (second ts) (into [kw] ts) (first ts)))
+
+(defn interpose-fn
+  [f fs]
+  (reduce (fn [_ f] (f)) nil (interpose f fs)))

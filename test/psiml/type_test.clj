@@ -13,37 +13,47 @@
            [:t-abs :x [:abs [:var :x] [:var :y]]] #{})
          #{:y})))
 
-(defmacro unifications?
-  [t1 t2 t-input t-output t-bi]
-  `(do (is (= (meet ~t1 ~t2 {}) [~t-input {}]))
-       (is (= (join ~t1 ~t2 {}) [~t-output {}]))
-       (is (= (first (first (biunify ~t1 ~t2 {}))) ~t-bi))))
+(def s-iibb [:struct {:i t-int :b t-bool}])
+(def s-ibbi [:struct {:i t-bool :b t-int}])
+(def s-abiibb [:struct {:a t-bool :i t-int :b t-bool}])
 
-(defn unified?
-  [t]
-  (unifications? t t t t t))
+(defn is-meet?
+  [a b r]
+  (is (= (simplify-input [:meet a b]) r)))
 
-(deftest bi-unify-basetypes
-  (unifications? t-int t-bool
-                     [:meet t-int t-bool]
-                     [:join t-int t-bool]
-                     nil)
-  (unified? t-int))
+(deftest test-meet
+  (is-meet? t-int t-int t-int)
+  (is-meet? t-int t-bool [:meet t-bool t-int])
+  (is-meet? s-iibb s-iibb s-iibb)
+  (is-meet? s-iibb s-ibbi
+            [:struct {:i [:meet t-bool t-int]
+                      :b [:meet t-bool t-int]}])
+  (is-meet? s-abiibb s-iibb s-abiibb))
 
-(deftest bi-unify-struct
-  (unified? [:struct {:i t-int :b t-bool}])
-  (unifications? [:struct {:i t-int :b t-bool}]
-                 [:struct {:b t-int :i t-bool}]
-                 [:struct {:i [:meet t-int t-bool]
-                           :b [:meet t-bool t-int]}]
-                 [:struct {:i [:join t-int t-bool]
-                           :b [:join t-bool t-int]}]
-                 nil)
-  (unifications? [:struct {:a t-bool :b t-bool :i t-int}]
-                 [:struct {:i t-int :b t-bool}]
-                 [:struct {:a t-bool :i t-int :b t-bool}]
-                 [:struct {:i t-int :b t-bool}]
-                 [:struct {:i t-int :b t-bool}]))
+(defn is-join?
+  [a b r]
+  (is (= (simplify-output [:join a b]) r)))
+
+(deftest test-join
+  (is-join? t-int t-int t-int)
+  (is-join? t-int t-bool [:join t-bool t-int])
+  (is-join? s-iibb s-iibb s-iibb)
+  (is-join? s-iibb s-ibbi
+            [:struct {:i [:join t-bool t-int]
+                      :b [:join t-bool t-int]}])
+  (is-join? s-abiibb s-iibb s-iibb))
+
+(defn is-biunify?
+  [a b r]
+  (is (= (first (biunify [[a b]] a {})) r)))
+
+(deftest test-biunify
+  (is-biunify? t-int t-int t-int)
+  (is-biunify? t-int t-bool nil)
+  (is-biunify? s-iibb s-iibb s-iibb)
+  (is-biunify? s-iibb s-ibbi nil)
+  (is-biunify? s-abiibb s-iibb s-abiibb)
+  (is-biunify? s-iibb s-abiibb nil))
 
 (deftest test-eq?
   (is (eq? [:t-abs :a [:var :a]]
@@ -52,14 +62,12 @@
 (defn is-typed?
   ([e t] (is-typed? e t {}))
   ([e t vars]
-   (let [[t' env] (expr e {:vars vars :bound-t-vars #{}})]
-     (is (eq? (first (abstract-types t' env)) t)))))
+   (let [[t' _] (expr e vars)]
+     (is (eq? t' t)))))
 
-(deftest expr-basetypes
+(deftest test-expr
   (is-typed? [:lit 1] t-int)
-  (is-typed? [:lit true] t-bool))
-
-(deftest expr-struct
+  (is-typed? [:lit true] t-bool)
   (let [s [:struct {:a [:lit 1] :b [:lit true]}]]
     (is-typed? s [:struct {:a t-int :b t-bool}])
     (is-typed? [:get :a s] t-int)))
@@ -67,7 +75,7 @@
 (def id [:abs :x [:var :x]])
 
 (deftest expr-id
-  (is-typed? id [:t-abs :a [:abs [:var :a] [:var :a]]]))
+  (is-typed? id [:abs [:var :a] [:var :a]]))
 
 (deftest select-int-bool
   (is-typed? [:abs :p
@@ -79,9 +87,17 @@
              [:abs [:abs t-int t-bool]
               [:abs t-int
                [:abs t-bool
-                [:join t-int t-bool]]]]
+                [:join t-bool t-int]]]]
              {:int-id [:abs t-int t-int]
               :bool-id [:abs t-bool t-bool]}))
+
+(deftest int-or-bool
+  (is-typed? [:if [:var :t] [:lit 1] [:lit true]]
+             [:join [:t :bool] [:t :int]]))
+
+(deftest a-or-b
+  (is-typed? [:if [:var :t] [:var :a] [:var :b]]
+             [:join [:var :a] [:var :b]]))
 
 (deftest select
   (is-typed? [:abs :p
@@ -90,12 +106,10 @@
                 [:if [:app [:var :p] [:var :v]]
                  [:var :v]
                  [:var :d]]]]]
-             [:t-abs :v
-              [:t-abs :d
-               [:abs [:abs [:var :v] t-bool]
-                [:abs [:var :v]
-                 [:abs [:var :d]
-                  [:join [:var :v] [:var :d]]]]]]]))
+             [:abs [:abs [:var :v] t-bool]
+              [:abs [:var :v]
+               [:abs [:var :d]
+                [:join [:var :v] [:var :d]]]]]))
 
 ;; NEXT TARGET:
 ;; (deftest meet-and
